@@ -34,6 +34,21 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const validatedData = createCampaignSchema.parse(req.body);
 
+    // 0. Verify user has a premium_users profile (required for foreign key)
+    const { data: userProfile, error: profileError } = await supabaseAdmin
+      .from('premium_users')
+      .select('id')
+      .eq('id', validatedData.advertiser_id)
+      .single();
+
+    if (profileError || !userProfile) {
+      res.status(400).json({
+        success: false,
+        error: 'User profile not found. Please complete your registration first.'
+      });
+      return;
+    }
+
     // 1. Create Campaign
     const { data: campaign, error: campaignError } = await supabaseAdmin
       .from('campaigns')

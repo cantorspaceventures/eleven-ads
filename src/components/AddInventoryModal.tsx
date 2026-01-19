@@ -57,16 +57,18 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Build payload excluding empty optional number fields
+      const { mau, bounce_rate, ...rest } = formData;
       const payload: any = {
         owner_id: user.id,
-        ...formData,
+        ...rest,
         daily_impressions: Number(formData.daily_impressions),
         base_price_aed: Number(formData.base_price_aed),
       };
 
-      // Clean up empty strings for optional number fields
-      if (formData.mau) payload.mau = Number(formData.mau);
-      if (formData.bounce_rate) payload.bounce_rate = Number(formData.bounce_rate);
+      // Only include optional number fields if they have values
+      if (mau) payload.mau = Number(mau);
+      if (bounce_rate) payload.bounce_rate = Number(bounce_rate);
 
       const res = await fetch('/api/inventory', {
         method: 'POST',
