@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { LogOut, BarChart2, List, Settings, Plus, Download, Eye, DollarSign, Upload } from 'lucide-react';
 import PublisherDealsList from '@/components/PublisherDealsList';
@@ -84,14 +84,14 @@ export default function PublisherDashboard() {
           </div>
         </div>
         <nav className="flex-1 p-4 space-y-1">
-          <a href="#" className="flex items-center space-x-3 px-4 py-3 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">
+          <Link to="/publisher-dashboard" className="flex items-center space-x-3 px-4 py-3 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">
             <BarChart2 className="w-5 h-5" />
             <span>Dashboard</span>
-          </a>
-          <a href="#" className="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 text-gray-600 rounded-lg text-sm font-medium transition-colors">
+          </Link>
+          <Link to="/publisher/my-inventory" className="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 text-gray-600 rounded-lg text-sm font-medium transition-colors">
             <List className="w-5 h-5" />
             <span>My Inventory</span>
-          </a>
+          </Link>
           <a href="#" className="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 text-gray-600 rounded-lg text-sm font-medium transition-colors">
             <Settings className="w-5 h-5" />
             <span>Settings</span>

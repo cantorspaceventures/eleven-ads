@@ -13,6 +13,8 @@ import InventoryDetailPage from "@/pages/InventoryDetailPage";
 import CampaignAnalyticsPage from "@/pages/CampaignAnalyticsPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import UpdatePasswordPage from "@/pages/UpdatePasswordPage";
+import MyInventoryPage from "@/pages/MyInventoryPage";
+import PublisherInventoryDetailPage from "@/pages/PublisherInventoryDetailPage";
 import { Toaster } from 'sonner';
 
 export default function App() {
@@ -29,6 +31,8 @@ export default function App() {
         <Route path="/campaigns/new" element={<CreateCampaignPage />} />
         <Route path="/campaigns/analytics" element={<CampaignAnalyticsPage />} />
         <Route path="/publisher-dashboard" element={<PublisherDashboard />} />
+        <Route path="/publisher/my-inventory" element={<MyInventoryPage />} />
+        <Route path="/publisher/inventory/:id" element={<PublisherInventoryDetailPage />} />
         <Route path="/publisher/bulk-upload" element={<BulkUploadPage />} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
         <Route path="/rtb-simulator" element={<RTBSimulatorPage />} />
