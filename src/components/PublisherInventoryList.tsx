@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { Search, Filter, MoreHorizontal, Edit, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight, ToggleLeft, ToggleRight, Shield, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface InventoryItem {
@@ -15,43 +16,108 @@ interface InventoryItem {
     daily_impressions: number;
   };
   base_price_aed: number;
-  status?: string; // Mocked for now
-  fill_rate?: number; // Mocked for now
+  is_available: boolean;
+  dynamic_pricing?: {
+    final_price_aed: number;
+  }[];
 }
 
 export default function PublisherInventoryList() {
+  const navigate = useNavigate();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('All Types');
   const [selectedStatus, setSelectedStatus] = useState('All Status');
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchInventory();
+    
+    // Close dropdown when clicking outside
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const fetchInventory = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      setUserId(user.id);
 
       const res = await fetch(`/api/inventory/publisher/${user.id}`);
       const data = await res.json();
 
       if (data.success) {
-        // Enhance with mock data for fields not yet in DB
-        const enhancedData = data.data.map((item: any) => ({
-          ...item,
-          status: Math.random() > 0.2 ? 'Active' : (Math.random() > 0.5 ? 'Paused' : 'Pending'),
-          fill_rate: Math.floor(Math.random() * (98 - 60) + 60)
-        }));
-        setInventory(enhancedData);
+        setInventory(data.data);
       }
     } catch (error) {
       console.error('Error fetching inventory:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleToggleAvailability = async (item: InventoryItem) => {
+    if (!userId) return;
+    
+    try {
+      const res = await fetch(`/api/inventory/${item.id}/availability`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          owner_id: userId,
+          is_available: !item.is_available 
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setInventory(prev => prev.map(inv => 
+          inv.id === item.id ? { ...inv, is_available: !inv.is_available } : inv
+        ));
+        toast.success(`Inventory ${item.is_available ? 'deactivated' : 'activated'} successfully`);
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update availability');
+    }
+    setOpenDropdown(null);
+  };
+
+  const handleDelete = async (item: InventoryItem) => {
+    if (!userId) return;
+    if (!confirm(`Are you sure you want to delete "${item.location_data.address}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/inventory/${item.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner_id: userId })
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setInventory(prev => prev.filter(inv => inv.id !== item.id));
+        toast.success('Inventory deleted successfully');
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete inventory');
+    }
+    setOpenDropdown(null);
   };
 
   const getTypeColor = (type: string) => {
@@ -64,20 +130,13 @@ export default function PublisherInventoryList() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'Active': return 'bg-green-100 text-green-800';
-      case 'Paused': return 'bg-yellow-100 text-yellow-800';
-      case 'Pending': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.location_data.address.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           item.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = selectedType === 'All Types' || item.inventory_type === selectedType;
-    const matchesStatus = selectedStatus === 'All Status' || item.status === selectedStatus;
+    const matchesStatus = selectedStatus === 'All Status' || 
+                          (selectedStatus === 'Active' && item.is_available) ||
+                          (selectedStatus === 'Inactive' && !item.is_available);
     
     return matchesSearch && matchesType && matchesStatus;
   });
@@ -126,8 +185,7 @@ export default function PublisherInventoryList() {
           >
             <option>All Status</option>
             <option>Active</option>
-            <option>Paused</option>
-            <option>Pending</option>
+            <option>Inactive</option>
           </select>
         </div>
       </div>
@@ -146,7 +204,6 @@ export default function PublisherInventoryList() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Daily Impr.</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPM</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fill Rate</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -177,21 +234,40 @@ export default function PublisherInventoryList() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     AED {item.base_price_aed}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                    {item.fill_rate}%
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status || 'Active')}`}>
-                      {item.status}
+                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                      {item.is_available ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button className="text-gray-400 hover:text-primary border border-gray-200 rounded px-2 py-1 flex items-center">
-                        Edit
+                    <div className="flex items-center justify-end space-x-1" ref={openDropdown === item.id ? dropdownRef : null}>
+                      <button 
+                        onClick={() => navigate(`/publisher/inventory/${item.id}`)}
+                        className="text-gray-500 hover:text-primary p-1.5 rounded hover:bg-gray-100 transition-colors"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
                       </button>
-                      <button className="text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-2 py-1">
-                        <MoreHorizontal className="w-4 h-4" />
+                      <button 
+                        onClick={() => handleToggleAvailability(item)}
+                        className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${item.is_available ? 'text-yellow-600 hover:text-yellow-700' : 'text-green-600 hover:text-green-700'}`}
+                        title={item.is_available ? 'Deactivate' : 'Activate'}
+                      >
+                        {item.is_available ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                      </button>
+                      <button 
+                        onClick={() => navigate(`/publisher/inventory/${item.id}/buyer-rules`)}
+                        className="text-blue-600 hover:text-blue-700 p-1.5 rounded hover:bg-gray-100 transition-colors"
+                        title="Buyer Access Rules"
+                      >
+                        <Shield className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(item)}
+                        className="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-gray-100 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>

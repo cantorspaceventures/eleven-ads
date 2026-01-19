@@ -278,6 +278,59 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
+ * Toggle inventory availability
+ * PATCH /api/inventory/:id/availability
+ */
+router.patch('/:id/availability', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { owner_id, is_available } = req.body;
+
+    // Verify ownership
+    const { data: item, error: fetchError } = await supabaseAdmin
+      .from('premium_inventory')
+      .select('owner_id, is_available')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !item) {
+      res.status(404).json({ success: false, error: 'Inventory not found' });
+      return;
+    }
+
+    if (item.owner_id !== owner_id) {
+      res.status(403).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+
+    // Update availability
+    const newAvailability = typeof is_available === 'boolean' ? is_available : !item.is_available;
+    
+    const { data, error: updateError } = await supabaseAdmin
+      .from('premium_inventory')
+      .update({ is_available: newAvailability })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    res.json({
+      success: true,
+      data,
+      message: `Inventory ${newAvailability ? 'activated' : 'deactivated'} successfully`
+    });
+
+  } catch (error) {
+    console.error('Toggle availability error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update inventory availability'
+    });
+  }
+});
+
+/**
  * Get inventory buyer access rules
  * GET /api/inventory/:id/rules
  */
@@ -399,6 +452,110 @@ router.put('/:id/rules', async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({
       success: false,
       error: 'Failed to save inventory rules'
+    });
+  }
+});
+
+/**
+ * Get inventory availability settings
+ * GET /api/inventory/:id/availability-settings
+ */
+router.get('/:id/availability-settings', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    
+    const { data, error } = await supabaseAdmin
+      .from('inventory_availability_settings')
+      .select('*')
+      .eq('inventory_id', id)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      throw error;
+    }
+
+    // Return default settings if none exist
+    const defaultSettings = {
+      inventory_id: id,
+      commitment_level: 'guaranteed',
+      min_booking_lead_time: '24_hours',
+      campaign_approval_sla: '4_business_hours',
+      block_out_periods: [],
+    };
+
+    res.json({
+      success: true,
+      data: data || defaultSettings,
+    });
+  } catch (error: any) {
+    console.error('Error fetching availability settings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch availability settings',
+    });
+  }
+});
+
+/**
+ * Update/Create inventory availability settings
+ * PUT /api/inventory/:id/availability-settings
+ */
+router.put('/:id/availability-settings', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { 
+      owner_id,
+      commitment_level,
+      min_booking_lead_time,
+      campaign_approval_sla,
+      block_out_periods
+    } = req.body;
+
+    // Verify ownership
+    const { data: inventory, error: fetchError } = await supabaseAdmin
+      .from('premium_inventory')
+      .select('owner_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !inventory) {
+      res.status(404).json({ success: false, error: 'Inventory not found' });
+      return;
+    }
+
+    if (inventory.owner_id !== owner_id) {
+      res.status(403).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+
+    // Upsert availability settings (insert or update)
+    const { data, error } = await supabaseAdmin
+      .from('inventory_availability_settings')
+      .upsert({
+        inventory_id: id,
+        commitment_level: commitment_level || 'guaranteed',
+        min_booking_lead_time: min_booking_lead_time || '24_hours',
+        campaign_approval_sla: campaign_approval_sla || '4_business_hours',
+        block_out_periods: block_out_periods || [],
+      }, {
+        onConflict: 'inventory_id'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data,
+      message: 'Availability settings saved successfully'
+    });
+
+  } catch (error: any) {
+    console.error('Error saving availability settings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save availability settings'
     });
   }
 });

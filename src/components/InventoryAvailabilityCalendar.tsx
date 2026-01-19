@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Plus, X } from 'lucide-react';
 
 interface BlockOutPeriod {
@@ -51,6 +51,13 @@ export default function InventoryAvailabilityCalendar({
     toDate: '',
     reason: '',
   });
+
+  // Update settings when initialSettings loads asynchronously
+  useEffect(() => {
+    if (initialSettings) {
+      setSettings(initialSettings);
+    }
+  }, [initialSettings]);
 
   // Calculate days in month
   const daysInMonth = useMemo(() => {

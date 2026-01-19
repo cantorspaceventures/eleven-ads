@@ -42,6 +42,13 @@ interface InventoryDetail {
   }[];
 }
 
+interface AvailabilitySettings {
+  commitmentLevel: 'guaranteed' | 'best_effort' | 'remnant';
+  minBookingLeadTime: string;
+  campaignApprovalSLA: string;
+  blockOutPeriods: { id: string; fromDate: string; toDate: string; reason?: string }[];
+}
+
 export default function PublisherInventoryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -51,6 +58,7 @@ export default function PublisherInventoryDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedInventoryId, setSelectedInventoryId] = useState<string>(id || '');
   const [allInventory, setAllInventory] = useState<InventoryDetail[]>([]);
+  const [availabilitySettings, setAvailabilitySettings] = useState<AvailabilitySettings | null>(null);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -71,6 +79,7 @@ export default function PublisherInventoryDetailPage() {
   useEffect(() => {
     if (selectedInventoryId) {
       fetchInventoryDetail();
+      fetchAvailabilitySettings();
     }
   }, [selectedInventoryId]);
 
@@ -103,15 +112,73 @@ export default function PublisherInventoryDetailPage() {
     }
   };
 
+  const fetchAvailabilitySettings = async () => {
+    try {
+      const res = await fetch(`/api/inventory/${selectedInventoryId}/availability-settings`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        // Transform from DB format to component format
+        setAvailabilitySettings({
+          commitmentLevel: data.data.commitment_level || 'guaranteed',
+          minBookingLeadTime: data.data.min_booking_lead_time || '24_hours',
+          campaignApprovalSLA: data.data.campaign_approval_sla || '4_business_hours',
+          blockOutPeriods: data.data.block_out_periods || [],
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching availability settings:', err);
+    }
+  };
+
+  const saveAvailabilitySettings = async (settings: AvailabilitySettings) => {
+    if (!user || !selectedInventoryId) return;
+    
+    try {
+      const res = await fetch(`/api/inventory/${selectedInventoryId}/availability-settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner_id: user.id,
+          commitment_level: settings.commitmentLevel,
+          min_booking_lead_time: settings.minBookingLeadTime,
+          campaign_approval_sla: settings.campaignApprovalSLA,
+          block_out_periods: settings.blockOutPeriods,
+        })
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setAvailabilitySettings(settings);
+        toast.success('Availability settings saved');
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save availability settings');
+    }
+  };
+
   const handleToggleAvailability = async () => {
     if (!item || !user) return;
     
+    const newAvailability = !item.is_available;
+    
     try {
-      // In a real app, you'd have an API endpoint for this
-      toast.success(`Inventory ${item.is_available ? 'deactivated' : 'activated'} successfully`);
-      setItem({ ...item, is_available: !item.is_available });
-    } catch (err) {
-      toast.error('Failed to update availability');
+      const res = await fetch(`/api/inventory/${item.id}/availability`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner_id: user.id, is_available: newAvailability })
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Inventory ${newAvailability ? 'activated' : 'deactivated'} successfully`);
+        setItem({ ...item, is_available: newAvailability });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update availability');
     }
   };
 
@@ -406,11 +473,8 @@ export default function PublisherInventoryDetailPage() {
               inventoryId={item.id}
               inventoryName={item.location_data.address}
               bookedDates={[]} // In a real app, fetch from deals/bookings
-              onSettingsChange={(settings) => {
-                console.log('Settings updated:', settings);
-                // In a real app, save to backend
-                toast.success('Availability settings updated');
-              }}
+              initialSettings={availabilitySettings || undefined}
+              onSettingsChange={saveAvailabilitySettings}
             />
 
             {/* Timestamps */}

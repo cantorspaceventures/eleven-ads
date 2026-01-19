@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MapPin, Eye, DollarSign, ArrowLeft, Info, TrendingUp, Clock, CheckCircle, Shield, AlertTriangle } from 'lucide-react';
+import { MapPin, Eye, DollarSign, ArrowLeft, Info, TrendingUp, Clock, CheckCircle, Shield, AlertTriangle, Calendar, Zap } from 'lucide-react';
 import NegotiationModal from '@/components/NegotiationModal';
 import CheckoutModal from '@/components/CheckoutModal';
 import AIExplanationCard from '@/components/AIExplanationCard';
@@ -45,6 +45,36 @@ interface InventoryRules {
   };
 }
 
+interface AvailabilitySettings {
+  commitment_level: 'guaranteed' | 'best_effort' | 'remnant';
+  min_booking_lead_time: string;
+  campaign_approval_sla: string;
+  block_out_periods: { id: string; fromDate: string; toDate: string; reason?: string }[];
+}
+
+const COMMITMENT_LABELS: Record<string, { label: string; color: string }> = {
+  guaranteed: { label: 'Guaranteed Supply', color: 'bg-green-100 text-green-800' },
+  best_effort: { label: 'Best Effort', color: 'bg-yellow-100 text-yellow-800' },
+  remnant: { label: 'Remnant / Opportunistic', color: 'bg-gray-100 text-gray-700' },
+};
+
+const LEAD_TIME_LABELS: Record<string, string> = {
+  no_lead: 'No minimum',
+  '24_hours': '24 hours',
+  '48_hours': '48 hours',
+  '72_hours': '72 hours',
+  '1_week': '1 week',
+  '2_weeks': '2 weeks',
+};
+
+const SLA_LABELS: Record<string, string> = {
+  auto_approve: 'Auto-approve',
+  '1_business_hour': '1 business hour',
+  '4_business_hours': '4 business hours',
+  '24_hours': '24 hours',
+  '48_hours': '48 hours',
+};
+
 const CATEGORY_LABELS: Record<string, string> = {
   alcohol_tobacco: 'Alcohol & Tobacco',
   gambling: 'Gambling & Betting',
@@ -60,6 +90,7 @@ export default function InventoryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [item, setItem] = useState<InventoryDetail | null>(null);
   const [rules, setRules] = useState<InventoryRules | null>(null);
+  const [availabilitySettings, setAvailabilitySettings] = useState<AvailabilitySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isNegotiationOpen, setIsNegotiationOpen] = useState(false);
@@ -68,6 +99,7 @@ export default function InventoryDetailPage() {
   useEffect(() => {
     fetchInventoryDetail();
     fetchInventoryRules();
+    fetchAvailabilitySettings();
   }, [id]);
 
   const fetchInventoryDetail = async () => {
@@ -95,6 +127,18 @@ export default function InventoryDetailPage() {
       }
     } catch (err) {
       console.error('Error fetching rules:', err);
+    }
+  };
+
+  const fetchAvailabilitySettings = async () => {
+    try {
+      const res = await fetch(`/api/inventory/${id}/availability-settings`);
+      const data = await res.json();
+      if (data.success) {
+        setAvailabilitySettings(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching availability settings:', err);
     }
   };
 
@@ -208,6 +252,84 @@ export default function InventoryDetailPage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Availability & Booking Settings */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+              <h2 className="text-xl font-bold text-secondary mb-6 flex items-center">
+                <Calendar className="w-5 h-5 mr-2 text-gray-400" />
+                Availability & Booking
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Commitment Level */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center mb-2">
+                    <Zap className="w-4 h-4 mr-2 text-primary" />
+                    <span className="text-sm font-medium text-gray-700">Supply Commitment</span>
+                  </div>
+                  {availabilitySettings?.commitment_level ? (
+                    <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${COMMITMENT_LABELS[availabilitySettings.commitment_level]?.color || 'bg-gray-100 text-gray-700'}`}>
+                      {COMMITMENT_LABELS[availabilitySettings.commitment_level]?.label || availabilitySettings.commitment_level}
+                    </span>
+                  ) : (
+                    <span className="inline-block px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800">
+                      Guaranteed Supply
+                    </span>
+                  )}
+                </div>
+
+                {/* Minimum Lead Time */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center mb-2">
+                    <Clock className="w-4 h-4 mr-2 text-blue-500" />
+                    <span className="text-sm font-medium text-gray-700">Min. Booking Lead Time</span>
+                  </div>
+                  <span className="text-lg font-bold text-secondary">
+                    {availabilitySettings?.min_booking_lead_time 
+                      ? LEAD_TIME_LABELS[availabilitySettings.min_booking_lead_time] || availabilitySettings.min_booking_lead_time
+                      : '24 hours'}
+                  </span>
+                </div>
+
+                {/* Approval SLA */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center mb-2">
+                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                    <span className="text-sm font-medium text-gray-700">Campaign Approval</span>
+                  </div>
+                  <span className="text-lg font-bold text-secondary">
+                    {availabilitySettings?.campaign_approval_sla 
+                      ? SLA_LABELS[availabilitySettings.campaign_approval_sla] || availabilitySettings.campaign_approval_sla
+                      : '4 business hours'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Block Out Dates */}
+              {availabilitySettings?.block_out_periods && availabilitySettings.block_out_periods.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Blocked Dates (Unavailable)</h3>
+                  <div className="space-y-2">
+                    {availabilitySettings.block_out_periods.map((period) => (
+                      <div 
+                        key={period.id}
+                        className="flex items-center justify-between p-3 bg-red-50 border border-red-100 rounded-lg"
+                      >
+                        <div className="flex items-center">
+                          <AlertTriangle className="w-4 h-4 text-red-500 mr-2" />
+                          <span className="text-sm font-medium text-red-800">
+                            {new Date(period.fromDate).toLocaleDateString()} - {new Date(period.toDate).toLocaleDateString()}
+                          </span>
+                          {period.reason && (
+                            <span className="text-xs text-red-600 ml-3">({period.reason})</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* AI Explanation Section */}
