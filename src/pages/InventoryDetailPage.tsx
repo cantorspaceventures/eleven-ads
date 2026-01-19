@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MapPin, Eye, DollarSign, ArrowLeft, Info, TrendingUp, Clock, CheckCircle } from 'lucide-react';
+import { MapPin, Eye, DollarSign, ArrowLeft, Info, TrendingUp, Clock, CheckCircle, Shield, AlertTriangle } from 'lucide-react';
 import NegotiationModal from '@/components/NegotiationModal';
 import CheckoutModal from '@/components/CheckoutModal';
 import AIExplanationCard from '@/components/AIExplanationCard';
@@ -33,9 +33,33 @@ interface InventoryDetail {
   }[];
 }
 
+interface InventoryRules {
+  access_mode: string;
+  prohibited_categories: string[];
+  brand_safety_level: string;
+  additional_restrictions: string;
+  deal_approval: {
+    manualReviewFor?: {
+      firstTimeBuyers?: boolean;
+    };
+  };
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  alcohol_tobacco: 'Alcohol & Tobacco',
+  gambling: 'Gambling & Betting',
+  political: 'Political Campaigns',
+  weight_loss: 'Weight Loss / Health Supplements',
+  dating: 'Dating Services',
+  adult: 'Adult Content',
+  cryptocurrency: 'Cryptocurrency',
+  firearms: 'Firearms & Weapons',
+};
+
 export default function InventoryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [item, setItem] = useState<InventoryDetail | null>(null);
+  const [rules, setRules] = useState<InventoryRules | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isNegotiationOpen, setIsNegotiationOpen] = useState(false);
@@ -43,6 +67,7 @@ export default function InventoryDetailPage() {
 
   useEffect(() => {
     fetchInventoryDetail();
+    fetchInventoryRules();
   }, [id]);
 
   const fetchInventoryDetail = async () => {
@@ -58,6 +83,18 @@ export default function InventoryDetailPage() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchInventoryRules = async () => {
+    try {
+      const res = await fetch(`/api/inventory/${id}/rules`);
+      const data = await res.json();
+      if (data.success) {
+        setRules(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching rules:', err);
     }
   };
 
@@ -175,6 +212,79 @@ export default function InventoryDetailPage() {
 
             {/* AI Explanation Section */}
             <AIExplanationCard inventoryId={item.id} />
+
+            {/* Content Guidelines & Restrictions */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+              <h2 className="text-xl font-bold text-secondary mb-6 flex items-center">
+                <Shield className="w-5 h-5 mr-2 text-gray-400" />
+                Content Guidelines & Restrictions
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Prohibited Content Categories</h3>
+                  <div className="space-y-2">
+                    {rules?.prohibited_categories && rules.prohibited_categories.length > 0 ? (
+                      rules.prohibited_categories.map((categoryId) => (
+                        <div key={categoryId} className="flex items-center text-sm text-red-600">
+                          <AlertTriangle className="w-4 h-4 mr-2" />
+                          {CATEGORY_LABELS[categoryId] || categoryId}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No specific content restrictions</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Brand Safety</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Safety Level</span>
+                      <span className={`px-2 py-1 text-xs font-medium rounded ${
+                        rules?.brand_safety_level === 'strict' ? 'bg-red-100 text-red-800' :
+                        rules?.brand_safety_level === 'relaxed' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {rules?.brand_safety_level ? 
+                          rules.brand_safety_level.charAt(0).toUpperCase() + rules.brand_safety_level.slice(1) : 
+                          'Standard'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Content Review</span>
+                      <span className="text-sm text-gray-700 font-medium">
+                        {rules?.deal_approval?.manualReviewFor?.firstTimeBuyers ? 
+                          'Required for first-time buyers' : 
+                          'Standard review'}
+                      </span>
+                    </div>
+                    {rules?.access_mode && rules.access_mode !== 'open' && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Access</span>
+                        <span className="text-sm text-gray-700 font-medium">
+                          {rules.access_mode === 'whitelist_only' ? 'Whitelist Only' : 'Invite Only'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {rules?.additional_restrictions && (
+                <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Additional Restrictions</h3>
+                  <p className="text-sm text-gray-600">{rules.additional_restrictions}</p>
+                </div>
+              )}
+              
+              <div className="mt-6 p-4 bg-amber-50 border border-amber-100 rounded-lg">
+                <p className="text-sm text-amber-800">
+                  <strong>Note:</strong> All creatives must comply with UAE advertising regulations and this inventory's content guidelines. Submissions may require publisher approval.
+                </p>
+              </div>
+            </div>
 
             {/* Map Placeholder */}
             <div className="bg-gray-200 rounded-xl h-64 flex items-center justify-center text-gray-400 border border-gray-300">

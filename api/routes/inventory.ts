@@ -277,4 +277,130 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+/**
+ * Get inventory buyer access rules
+ * GET /api/inventory/:id/rules
+ */
+router.get('/:id/rules', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    
+    const { data, error } = await supabaseAdmin
+      .from('inventory_rules')
+      .select('*')
+      .eq('inventory_id', id)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      throw error;
+    }
+
+    // Return default rules if none exist
+    const defaultRules = {
+      inventory_id: id,
+      access_mode: 'open',
+      whitelisted_buyers: [],
+      blacklisted_buyers: [],
+      deal_approval: {
+        autoApprove: false,
+        autoApproveConditions: {
+          meetsFloorPrice: true,
+          passesBrandSafety: true,
+          buyerVerified: true,
+        },
+        manualReviewFor: {
+          dealsAboveThreshold: true,
+          thresholdAmount: 10000,
+          sensitiveContent: true,
+          firstTimeBuyers: true,
+        },
+      },
+      prohibited_categories: [],
+      brand_safety_level: 'standard',
+      additional_restrictions: '',
+    };
+
+    res.json({
+      success: true,
+      data: data || defaultRules,
+    });
+  } catch (error: any) {
+    console.error('Error fetching inventory rules:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch inventory rules',
+    });
+  }
+});
+
+/**
+ * Update/Create inventory buyer access rules
+ * PUT /api/inventory/:id/rules
+ */
+router.put('/:id/rules', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { 
+      owner_id,
+      access_mode,
+      whitelisted_buyers,
+      blacklisted_buyers,
+      deal_approval,
+      prohibited_categories,
+      brand_safety_level,
+      additional_restrictions
+    } = req.body;
+
+    // Verify ownership
+    const { data: inventory, error: fetchError } = await supabaseAdmin
+      .from('premium_inventory')
+      .select('owner_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !inventory) {
+      res.status(404).json({ success: false, error: 'Inventory not found' });
+      return;
+    }
+
+    if (inventory.owner_id !== owner_id) {
+      res.status(403).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+
+    // Upsert rules (insert or update)
+    const { data, error } = await supabaseAdmin
+      .from('inventory_rules')
+      .upsert({
+        inventory_id: id,
+        access_mode: access_mode || 'open',
+        whitelisted_buyers: whitelisted_buyers || [],
+        blacklisted_buyers: blacklisted_buyers || [],
+        deal_approval: deal_approval || {},
+        prohibited_categories: prohibited_categories || [],
+        brand_safety_level: brand_safety_level || 'standard',
+        additional_restrictions: additional_restrictions || '',
+      }, {
+        onConflict: 'inventory_id'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data,
+      message: 'Inventory rules saved successfully'
+    });
+
+  } catch (error: any) {
+    console.error('Error saving inventory rules:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save inventory rules'
+    });
+  }
+});
+
 export default router;

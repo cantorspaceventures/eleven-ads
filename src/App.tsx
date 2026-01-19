@@ -15,6 +15,7 @@ import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import UpdatePasswordPage from "@/pages/UpdatePasswordPage";
 import MyInventoryPage from "@/pages/MyInventoryPage";
 import PublisherInventoryDetailPage from "@/pages/PublisherInventoryDetailPage";
+import BuyerAccessRulesPage from "@/pages/BuyerAccessRulesPage";
 import { Toaster } from 'sonner';
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="/publisher-dashboard" element={<PublisherDashboard />} />
         <Route path="/publisher/my-inventory" element={<MyInventoryPage />} />
         <Route path="/publisher/inventory/:id" element={<PublisherInventoryDetailPage />} />
+        <Route path="/publisher/inventory/:id/buyer-rules" element={<BuyerAccessRulesPage />} />
         <Route path="/publisher/bulk-upload" element={<BulkUploadPage />} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
         <Route path="/rtb-simulator" element={<RTBSimulatorPage />} />

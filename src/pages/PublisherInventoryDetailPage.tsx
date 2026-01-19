@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { 
   ArrowLeft, MapPin, Eye, DollarSign, Edit, Trash2, ToggleLeft, ToggleRight,
-  LogOut, BarChart2, List, Settings, Clock, TrendingUp, Calendar, Save
+  LogOut, BarChart2, List, Settings, Clock, TrendingUp, Calendar, Save, Shield
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Logo from '@/components/Logo';
@@ -248,6 +248,12 @@ export default function PublisherInventoryDetailPage() {
                 </div>
                 
                 <div className="flex flex-wrap gap-2">
+                  <Link
+                    to={`/publisher/inventory/${item.id}/buyer-rules`}
+                    className="flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 transition-colors"
+                  >
+                    <Shield className="w-4 h-4 mr-2" /> Buyer Access Rules
+                  </Link>
                   <button
                     onClick={handleToggleAvailability}
                     className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
