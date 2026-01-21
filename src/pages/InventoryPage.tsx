@@ -8,7 +8,8 @@ interface Inventory {
   inventory_type: string;
   location_emirate: string;
   location_data: {
-    address: string;
+    placement_name?: string; // Custom listing name
+    address: string; // Placement type
     format: string;
     dimensions?: string;
   };
@@ -17,10 +18,18 @@ interface Inventory {
     demographics: any;
   };
   base_price_aed: number;
+  // CPM pricing for digital inventory
+  min_spend_aed?: number;
+  cost_per_impression_aed?: number;
+  image_url?: string;
   premium_users: {
     business_name: string;
   };
 }
+
+// Helper to check if inventory is digital (uses CPM pricing)
+const isDigitalInventory = (type: string) => 
+  ['streaming_radio', 'streaming_video', 'app', 'web'].includes(type);
 
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<Inventory[]>([]);
@@ -59,10 +68,12 @@ export default function InventoryPage() {
   };
 
   const filteredInventory = inventory.filter(item => {
+    const placementName = item.location_data?.placement_name || '';
     const address = item.location_data?.address || '';
     const businessName = item.premium_users?.business_name || '';
     
-    return address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    return placementName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      address.toLowerCase().includes(searchTerm.toLowerCase()) ||
       businessName.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
@@ -146,10 +157,17 @@ export default function InventoryPage() {
             {filteredInventory.map((item) => (
               <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group">
                 <div className="h-48 bg-gray-100 relative">
-                  {/* Placeholder for Image */}
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-200">
-                    <span className="font-medium">{item.inventory_type} Preview</span>
-                  </div>
+                  {item.image_url ? (
+                    <img 
+                      src={item.image_url} 
+                      alt={item.location_data.address}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-200">
+                      <span className="font-medium">{item.inventory_type} Preview</span>
+                    </div>
+                  )}
                   <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-secondary shadow-sm">
                     {item.inventory_type.replace('_', ' ').toUpperCase()}
                   </div>
@@ -157,10 +175,14 @@ export default function InventoryPage() {
                 
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-bold text-secondary line-clamp-1" title={item.location_data.address}>
-                      {item.location_data.address}
+                    <h3 className="text-lg font-bold text-secondary line-clamp-1" 
+                        title={item.location_data.placement_name || item.location_data.address}>
+                      {item.location_data.placement_name || item.location_data.address}
                     </h3>
                   </div>
+                  {item.location_data.placement_name && (
+                    <p className="text-xs text-gray-400 mb-1">{item.location_data.address}</p>
+                  )}
                   <p className="text-sm text-gray-500 mb-4">{item.premium_users.business_name}</p>
                   
                   <div className="space-y-3 mb-6">
@@ -182,11 +204,27 @@ export default function InventoryPage() {
 
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                     <div>
-                      <p className="text-xs text-gray-400">Base Price</p>
-                      <p className="text-lg font-bold text-secondary flex items-center">
-                        <DollarSign className="w-4 h-4 mr-1" />
-                        {item.base_price_aed.toLocaleString()} <span className="text-xs font-normal text-gray-400 ml-1">AED</span>
-                      </p>
+                      {isDigitalInventory(item.inventory_type) && item.cost_per_impression_aed ? (
+                        // Digital inventory: show per-impression price
+                        <>
+                          <p className="text-xs text-green-600 font-medium">Per Impression</p>
+                          <p className="text-lg font-bold text-green-600 flex items-center">
+                            AED {item.cost_per_impression_aed.toFixed(4)}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            Min: AED {(item.min_spend_aed || 0).toLocaleString()}
+                          </p>
+                        </>
+                      ) : (
+                        // OOH/DOOH: show flat rate
+                        <>
+                          <p className="text-xs text-gray-400">Base Price</p>
+                          <p className="text-lg font-bold text-secondary flex items-center">
+                            <DollarSign className="w-4 h-4 mr-1" />
+                            {item.base_price_aed.toLocaleString()} <span className="text-xs font-normal text-gray-400 ml-1">AED</span>
+                          </p>
+                        </>
+                      )}
                     </div>
                     <Link to={`/inventory/${item.id}`} className="bg-secondary text-white p-2 rounded-lg hover:bg-secondary/90 transition-colors group-hover:scale-105 transform duration-200">
                       <ArrowRight className="w-5 h-5" />

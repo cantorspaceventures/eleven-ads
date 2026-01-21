@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Upload, MapPin, Radio, Smartphone, Globe, MonitorPlay, FileText, Users, Activity, ToggleLeft, ToggleRight } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Upload, MapPin, Radio, Smartphone, Globe, MonitorPlay, FileText, Users, ToggleLeft, ToggleRight, ImagePlus, Link as LinkIcon, DollarSign } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -8,16 +8,101 @@ interface AddInventoryModalProps {
   onClose: () => void;
 }
 
+// Placement options by media type (merged from 11ADS Pricing Strategy + Industry Standards)
+const PLACEMENTS_BY_TYPE: Record<string, string[]> = {
+  'OOH': [
+    'Highway Billboard',
+    'Street Level Billboard',
+    'Building Wrap',
+    'Transit Shelter',
+    'Bus Stop',
+    'Mall Exterior',
+    'Stadium Billboard',
+  ],
+  'DOOH': [
+    'Digital Billboard',
+    'Mall Digital Screen',
+    'Transit Screen',
+    'Airport Display',
+    'Retail Digital Signage',
+    'Elevator Screen',
+    'Gas Station Display',
+  ],
+  'streaming_radio': [
+    'Pre-roll Audio',
+    'Mid-roll Audio',
+    'Post-roll Audio',
+    'Sponsored Segment',
+    'Host-read Ad',
+    'Podcast Sponsorship',
+  ],
+  'streaming_video': [
+    'Pre-roll Video',
+    'Mid-roll Video',
+    'Post-roll Video',
+    'Overlay Banner',
+    'Companion Banner',
+    'Branded Content',
+    'CTV Home Screen',
+  ],
+  'app': [
+    'Banner Ad',
+    'Interstitial',
+    'Rewarded Video',
+    'Native Ad',
+    'App Open Ad',
+    'In-feed Ad',
+    'Playable Ad',
+  ],
+  'web': [
+    'Homepage Banner',
+    'Leaderboard (728x90)',
+    'Medium Rectangle (300x250)',
+    'Skyscraper (160x600)',
+    'In-article Ad',
+    'Sticky Footer',
+    'Native Content',
+    'Video Player Ad',
+  ],
+};
+
+// Ad formats available for each media type
+const AD_FORMATS_BY_TYPE: Record<string, string[]> = {
+  'OOH': ['JPG', 'PNG', 'PDF'],
+  'DOOH': ['JPG', 'PNG', 'MP4', 'HTML5', 'GIF'],
+  'streaming_radio': ['MP3', 'WAV', 'AAC', 'VAST'],
+  'streaming_video': ['MP4', 'MOV', 'WebM', 'VAST', 'HTML5'],
+  'app': ['JPG', 'PNG', 'GIF', 'HTML5', 'MP4', 'MRAID'],
+  'web': ['JPG', 'PNG', 'GIF', 'HTML5', 'MP4', 'JavaScript Tag'],
+};
+
 export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModalProps) {
   const [loading, setLoading] = useState(false);
+  
+  // Image state
+  const [imageMode, setImageMode] = useState<'url' | 'upload'>('url');
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [formData, setFormData] = useState({
     inventory_type: 'OOH',
     location_emirate: 'Dubai',
-    address: '',
+    placement_name: '', // Custom name for the listing (shown in header)
+    address: '', // Placement type (dropdown selection)
     format: '',
     dimensions: '',
     daily_impressions: '',
     base_price_aed: '',
+    // CPM pricing for digital inventory
+    min_spend_aed: '',
+    cost_per_impression_aed: '',
+    // Context-specific fields
+    physical_address: '',
+    app_name: '',
+    website_url: '',
+    platform_name: '',
     // Extended Fields
     station_format: '',
     video_quality: 'HD',
@@ -28,9 +113,12 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
     app_category: ''
   });
 
-  // Reset form when type changes to avoid carry-over of irrelevant data
+  // Helper to check if inventory type is digital (uses CPM pricing)
+  const isDigitalInventory = ['streaming_radio', 'streaming_video', 'app', 'web'].includes(formData.inventory_type);
+
+  // Reset format and placement when type changes since available options differ
   useEffect(() => {
-    // Optional: clear specific fields if needed
+    setFormData(prev => ({ ...prev, format: '', address: '' }));
   }, [formData.inventory_type]);
 
   if (!isOpen) return null;
@@ -49,6 +137,47 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
       setFormData(prev => ({ ...prev, [field]: !(prev as any)[field] }));
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image must be less than 5MB');
+        return;
+      }
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const uploadImage = async (userId: string): Promise<string | null> => {
+    if (imageMode === 'url' && imageUrl) {
+      return imageUrl;
+    }
+    
+    if (imageMode === 'upload' && imageFile) {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${userId}/${Date.now()}.${fileExt}`;
+      
+      const { error } = await supabase.storage
+        .from('inventory-images')
+        .upload(fileName, imageFile);
+      
+      if (error) throw error;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('inventory-images')
+        .getPublicUrl(fileName);
+      
+      return publicUrl;
+    }
+    
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -57,14 +186,31 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Upload image if provided
+      const uploadedImageUrl = await uploadImage(user.id);
+
       // Build payload excluding empty optional number fields
-      const { mau, bounce_rate, ...rest } = formData;
+      const { mau, bounce_rate, min_spend_aed, cost_per_impression_aed, ...rest } = formData;
+      const isDigital = ['streaming_radio', 'streaming_video', 'app', 'web'].includes(formData.inventory_type);
+      
       const payload: any = {
         owner_id: user.id,
         ...rest,
         daily_impressions: Number(formData.daily_impressions),
-        base_price_aed: Number(formData.base_price_aed),
+        // For digital inventory, use min_spend as base_price (or 0 if not set)
+        base_price_aed: isDigital ? (min_spend_aed ? Number(min_spend_aed) : 0) : Number(formData.base_price_aed),
       };
+
+      // Add CPM fields for digital inventory
+      if (isDigital) {
+        if (min_spend_aed) payload.min_spend_aed = Number(min_spend_aed);
+        if (cost_per_impression_aed) payload.cost_per_impression_aed = Number(cost_per_impression_aed);
+      }
+
+      // Add image URL if provided
+      if (uploadedImageUrl) {
+        payload.image_url = uploadedImageUrl;
+      }
 
       // Only include optional number fields if they have values
       if (mau) payload.mau = Number(mau);
@@ -199,6 +345,21 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Placement Name - Shown in listing header */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Placement Name *</label>
+            <input
+              type="text"
+              name="placement_name"
+              required
+              placeholder="e.g. Homepage Banner, Pre-roll 30s, Mall Entrance Screen"
+              value={formData.placement_name}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-medium"
+            />
+            <p className="text-xs text-gray-400 mt-1">This name will be displayed as the listing title</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Media Type</label>
@@ -227,6 +388,10 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
                 <option value="Dubai">Dubai</option>
                 <option value="Abu Dhabi">Abu Dhabi</option>
                 <option value="Sharjah">Sharjah</option>
+                <option value="Ajman">Ajman</option>
+                <option value="Umm Al Quwain">Umm Al Quwain</option>
+                <option value="Ras Al Khaimah">Ras Al Khaimah</option>
+                <option value="Fujairah">Fujairah</option>
                 <option value="Global">Global (Digital Only)</option>
               </select>
             </div>
@@ -234,24 +399,203 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {['streaming_radio', 'streaming_video', 'app', 'web'].includes(formData.inventory_type) ? 'Placement Name' : 'Physical Address'}
+              {['streaming_radio', 'streaming_video', 'app', 'web'].includes(formData.inventory_type) ? 'Placement Type' : 'Placement Type'}
             </label>
             <div className="relative">
               {['OOH', 'DOOH'].includes(formData.inventory_type) ? (
-                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               ) : (
-                 <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               )}
-              <input
-                type="text"
+              <select
                 name="address"
                 required
-                placeholder={['streaming_radio', 'streaming_video', 'app', 'web'].includes(formData.inventory_type) ? "e.g. Pre-roll Slot, Homepage Banner" : "e.g. Sheikh Zayed Road, Exit 42"}
                 value={formData.address}
                 onChange={handleChange}
-                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-              />
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
+              >
+                <option value="">Select Placement...</option>
+                {PLACEMENTS_BY_TYPE[formData.inventory_type]?.map((placement) => (
+                  <option key={placement} value={placement}>{placement}</option>
+                ))}
+              </select>
             </div>
+          </div>
+
+          {/* Context-specific identifier field */}
+          {['OOH', 'DOOH'].includes(formData.inventory_type) && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Physical Address</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  name="physical_address"
+                  required
+                  placeholder="e.g. Sheikh Zayed Road, Near Mall of Emirates"
+                  value={formData.physical_address}
+                  onChange={handleChange}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {formData.inventory_type === 'app' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">App Name</label>
+              <div className="relative">
+                <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  name="app_name"
+                  required
+                  placeholder="e.g. Careem, Noon, Talabat"
+                  value={formData.app_name}
+                  onChange={handleChange}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {formData.inventory_type === 'web' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+              <div className="relative">
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="url"
+                  name="website_url"
+                  required
+                  placeholder="e.g. https://khaleejtimes.com"
+                  value={formData.website_url}
+                  onChange={handleChange}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {['streaming_radio', 'streaming_video'].includes(formData.inventory_type) && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {formData.inventory_type === 'streaming_radio' ? 'Station / Platform Name' : 'Channel / Platform Name'}
+              </label>
+              <div className="relative">
+                {formData.inventory_type === 'streaming_radio' ? (
+                  <Radio className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                ) : (
+                  <MonitorPlay className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                )}
+                <input
+                  type="text"
+                  name="platform_name"
+                  required
+                  placeholder={formData.inventory_type === 'streaming_radio' ? "e.g. ARN, Virgin Radio Dubai" : "e.g. Shahid, OSN, StarzPlay"}
+                  value={formData.platform_name}
+                  onChange={handleChange}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Image Upload Section */}
+          <div className="border border-gray-200 rounded-lg p-4">
+            <label className="block text-sm font-medium text-gray-700 mb-3 flex items-center">
+              <ImagePlus className="w-4 h-4 mr-2" /> Inventory Image (Optional)
+            </label>
+            
+            {/* Mode Toggle */}
+            <div className="flex gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setImageMode('url')}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-colors ${
+                  imageMode === 'url' 
+                    ? 'bg-primary text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <LinkIcon className="w-4 h-4" /> URL
+              </button>
+              <button
+                type="button"
+                onClick={() => setImageMode('upload')}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-colors ${
+                  imageMode === 'upload' 
+                    ? 'bg-primary text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <Upload className="w-4 h-4" /> Upload
+              </button>
+            </div>
+
+            {imageMode === 'url' ? (
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm"
+              />
+            ) : (
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                {imagePreview ? (
+                  <div className="relative">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-32 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageFile(null);
+                        setImagePreview(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-500 hover:border-primary hover:text-primary transition-colors"
+                  >
+                    <ImagePlus className="w-8 h-8 mb-2" />
+                    <span className="text-sm">Click to upload image</span>
+                    <span className="text-xs text-gray-400 mt-1">Max 5MB</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* URL Preview */}
+            {imageMode === 'url' && imageUrl && (
+              <div className="mt-3">
+                <img
+                  src={imageUrl}
+                  alt="Preview"
+                  className="w-full h-32 object-cover rounded-lg"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Dynamic Digital Fields */}
@@ -261,15 +605,18 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ad Format</label>
-              <input
-                type="text"
+              <select
                 name="format"
                 required
-                placeholder="e.g. MP4, JPG, HTML5"
                 value={formData.format}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-              />
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
+              >
+                <option value="">Select Format...</option>
+                {AD_FORMATS_BY_TYPE[formData.inventory_type]?.map((fmt) => (
+                  <option key={fmt} value={fmt}>{fmt}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Dimensions / Duration</label>
@@ -284,12 +631,90 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Daily Impressions</label>
-              <div className="relative">
-                 <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3 h-3" />
-                 <input
+          {/* Pricing Section - Different for OOH vs Digital */}
+          {isDigitalInventory ? (
+            // Digital Inventory: CPM Pricing
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+              <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                <DollarSign className="w-4 h-4 mr-2 text-green-600" /> Per Impression Pricing
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Daily Impressions</label>
+                  <div className="relative">
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3 h-3" />
+                    <input
+                      type="number"
+                      name="daily_impressions"
+                      required
+                      min="0"
+                      placeholder="0"
+                      value={formData.daily_impressions}
+                      onChange={handleChange}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Minimum Spend (AED)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">AED</span>
+                    <input
+                      type="number"
+                      name="min_spend_aed"
+                      required
+                      min="0"
+                      step="0.01"
+                      placeholder="500.00"
+                      value={formData.min_spend_aed}
+                      onChange={handleChange}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-bold text-gray-900 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cost Per Impression (AED)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">AED</span>
+                  <input
+                    type="number"
+                    name="cost_per_impression_aed"
+                    required
+                    min="0"
+                    step="0.000001"
+                    placeholder="0.002"
+                    value={formData.cost_per_impression_aed}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-bold text-gray-900 bg-white"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Price per single impression (e.g., 0.002 = AED 2 per 1000 impressions)</p>
+              </div>
+              {/* Live Price Preview */}
+              {formData.cost_per_impression_aed && (
+                <div className="mt-4 p-3 bg-white rounded-lg border border-green-200">
+                  <p className="text-xs text-gray-500 mb-1">Buyers will see:</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-lg font-bold text-green-600">
+                      AED {Number(formData.cost_per_impression_aed).toFixed(4)}
+                    </span>
+                    <span className="text-sm text-gray-500">per impression</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    = AED {(Number(formData.cost_per_impression_aed) * 1000).toFixed(2)} CPM (per 1000 impressions)
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            // OOH/DOOH: Flat Rate Pricing
+            <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Daily Impressions</label>
+                <div className="relative">
+                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3 h-3" />
+                  <input
                     type="number"
                     name="daily_impressions"
                     required
@@ -299,13 +724,13 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
                     onChange={handleChange}
                     className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                   />
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Base Price (AED)</label>
-              <div className="relative">
-                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">AED</span>
-                 <input
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Base Price (AED/Day)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">AED</span>
+                  <input
                     type="number"
                     name="base_price_aed"
                     required
@@ -316,9 +741,10 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
                     onChange={handleChange}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-bold text-gray-900"
                   />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="pt-2">
             <button

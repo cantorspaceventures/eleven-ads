@@ -8,12 +8,22 @@ const createInventorySchema = z.object({
   owner_id: z.string().uuid(),
   inventory_type: z.enum(['OOH', 'DOOH', 'streaming_radio', 'streaming_video', 'app', 'web']),
   location_emirate: z.string(),
-  address: z.string(),
+  placement_name: z.string().min(1, 'Placement name is required'), // Custom name for the listing
+  address: z.string(), // Placement type (dropdown selection)
   format: z.string(),
   dimensions: z.string().optional(),
   daily_impressions: z.number().positive(),
-  base_price_aed: z.number().positive(),
-  // New Digital Media Fields (Optional)
+  base_price_aed: z.number().nonnegative(), // Changed to nonnegative for digital inventory (can be 0 if only using CPM)
+  image_url: z.string().url().optional().or(z.literal('')),
+  // CPM Pricing for digital inventory
+  min_spend_aed: z.number().nonnegative().optional(),
+  cost_per_impression_aed: z.number().nonnegative().optional(),
+  // Context-specific identifiers
+  physical_address: z.string().optional(),
+  app_name: z.string().optional(),
+  website_url: z.string().optional(),
+  platform_name: z.string().optional(),
+  // Digital Media Fields (Optional)
   station_format: z.string().optional(),
   listener_demographics: z.any().optional(),
   video_quality: z.string().optional(),
@@ -33,32 +43,49 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const validatedData = createInventorySchema.parse(req.body);
 
     // 1. Create Inventory Record
+    const isDigitalInventory = ['streaming_radio', 'streaming_video', 'app', 'web'].includes(validatedData.inventory_type);
+    
+    const inventoryInsert: any = {
+      owner_id: validatedData.owner_id,
+      inventory_type: validatedData.inventory_type,
+      location_emirate: validatedData.location_emirate,
+      location_data: {
+        placement_name: validatedData.placement_name, // Custom listing name (shown in header)
+        address: validatedData.address, // Placement type (dropdown selection)
+        format: validatedData.format,
+        dimensions: validatedData.dimensions,
+        // Context-specific identifiers
+        physical_address: validatedData.physical_address,
+        app_name: validatedData.app_name,
+        website_url: validatedData.website_url,
+        platform_name: validatedData.platform_name,
+        // Extended Metadata
+        station_format: validatedData.station_format,
+        video_quality: validatedData.video_quality,
+        ad_skippable: validatedData.ad_skippable,
+        website_category: validatedData.website_category,
+        app_category: validatedData.app_category,
+      },
+      audience_metrics: {
+        daily_impressions: validatedData.daily_impressions,
+        demographics: validatedData.listener_demographics || { type: 'General' },
+        mau: validatedData.mau,
+        bounce_rate: validatedData.bounce_rate,
+      },
+      base_price_aed: validatedData.base_price_aed || validatedData.min_spend_aed || 0,
+      image_url: validatedData.image_url || null,
+      is_available: true
+    };
+
+    // Add CPM pricing fields for digital inventory
+    if (isDigitalInventory) {
+      if (validatedData.min_spend_aed) inventoryInsert.min_spend_aed = validatedData.min_spend_aed;
+      if (validatedData.cost_per_impression_aed) inventoryInsert.cost_per_impression_aed = validatedData.cost_per_impression_aed;
+    }
+
     const { data: inventory, error: invError } = await supabaseAdmin
       .from('premium_inventory')
-      .insert({
-        owner_id: validatedData.owner_id,
-        inventory_type: validatedData.inventory_type,
-        location_emirate: validatedData.location_emirate,
-        location_data: {
-          address: validatedData.address,
-          format: validatedData.format,
-          dimensions: validatedData.dimensions,
-          // Extended Metadata
-          station_format: validatedData.station_format,
-          video_quality: validatedData.video_quality,
-          ad_skippable: validatedData.ad_skippable,
-          website_category: validatedData.website_category,
-          app_category: validatedData.app_category,
-        },
-        audience_metrics: {
-          daily_impressions: validatedData.daily_impressions,
-          demographics: validatedData.listener_demographics || { type: 'General' },
-          mau: validatedData.mau,
-          bounce_rate: validatedData.bounce_rate,
-        },
-        base_price_aed: validatedData.base_price_aed,
-        is_available: true
-      })
+      .insert(inventoryInsert)
       .select()
       .single();
 
@@ -224,6 +251,122 @@ router.get('/publisher/:id', async (req: Request, res: Response): Promise<void> 
     res.status(500).json({
       success: false,
       error: 'Failed to fetch inventory',
+    });
+  }
+});
+
+/**
+ * Update inventory and dynamic pricing
+ * PUT /api/inventory/:id
+ */
+router.put('/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const {
+      owner_id,
+      // Basic info fields
+      placement_name,
+      image_url,
+      // Metrics
+      base_price_aed,
+      daily_impressions,
+      dimensions,
+      mau,
+      bounce_rate,
+      demand_multiplier,
+      time_multiplier,
+      final_price_aed,
+      // CPM pricing fields
+      min_spend_aed,
+      cost_per_impression_aed,
+    } = req.body;
+
+    // Verify ownership
+    const { data: item, error: fetchError } = await supabaseAdmin
+      .from('premium_inventory')
+      .select('owner_id, inventory_type, location_data, audience_metrics, base_price_aed, min_spend_aed, cost_per_impression_aed, image_url')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !item) {
+      res.status(404).json({ success: false, error: 'Inventory not found' });
+      return;
+    }
+
+    if (item.owner_id !== owner_id) {
+      res.status(403).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+
+    // Update inventory
+    const updatedLocationData = {
+      ...item.location_data,
+      placement_name: placement_name !== undefined ? placement_name : item.location_data.placement_name,
+      dimensions: dimensions || item.location_data.dimensions,
+    };
+
+    const updatedAudienceMetrics = {
+      ...item.audience_metrics,
+      daily_impressions: daily_impressions ?? item.audience_metrics.daily_impressions,
+      mau: mau ?? item.audience_metrics.mau,
+      bounce_rate: bounce_rate ?? item.audience_metrics.bounce_rate,
+    };
+
+    // Build update object
+    const updateData: any = {
+      base_price_aed: base_price_aed ?? item.base_price_aed,
+      location_data: updatedLocationData,
+      audience_metrics: updatedAudienceMetrics,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Update image URL if provided
+    if (image_url !== undefined) {
+      updateData.image_url = image_url;
+    }
+
+    // Handle CPM pricing fields for digital inventory
+    const isDigitalInventory = ['streaming_radio', 'streaming_video', 'app', 'web'].includes(item.inventory_type);
+    if (isDigitalInventory) {
+      if (min_spend_aed !== undefined) updateData.min_spend_aed = min_spend_aed;
+      if (cost_per_impression_aed !== undefined) updateData.cost_per_impression_aed = cost_per_impression_aed;
+    }
+
+    const { data: updatedInventory, error: updateError } = await supabaseAdmin
+      .from('premium_inventory')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Update dynamic pricing
+    if (demand_multiplier !== undefined || time_multiplier !== undefined) {
+      const { error: pricingError } = await supabaseAdmin
+        .from('dynamic_pricing')
+        .update({
+          demand_multiplier: demand_multiplier ?? 1,
+          time_multiplier: time_multiplier ?? 1,
+          final_price_aed: final_price_aed ?? base_price_aed,
+          calculated_at: new Date().toISOString(),
+        })
+        .eq('inventory_id', id);
+
+      if (pricingError) throw pricingError;
+    }
+
+    res.json({
+      success: true,
+      data: updatedInventory,
+      message: 'Inventory updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Update inventory error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update inventory'
     });
   }
 });
