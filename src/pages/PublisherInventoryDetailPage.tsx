@@ -227,6 +227,14 @@ export default function PublisherInventoryDetailPage() {
     }
   };
 
+  const getInventoryDisplayName = (item: InventoryDetail) => {
+    const data = item.location_data as any;
+    if (['streaming_radio', 'streaming_video', 'app', 'web'].includes(item.inventory_type)) {
+       return data.station_name || data.app_name || data.platform || data.address;
+    }
+    return data.address;
+  };
+
   if (!user) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   return (
@@ -315,12 +323,18 @@ export default function PublisherInventoryDetailPage() {
                     </span>
                   </div>
                   <h1 className="text-2xl font-heading font-bold text-secondary mb-2">
-                    {item.location_data.address}
+                    {getInventoryDisplayName(item)}
                   </h1>
                   <p className="text-gray-500 flex items-center">
                     <MapPin className="w-4 h-4 mr-2" />
                     {item.location_emirate}, United Arab Emirates
                   </p>
+                  {['streaming_radio', 'streaming_video', 'app', 'web'].includes(item.inventory_type) && item.location_data.address && (
+                    <p className="text-gray-400 text-sm flex items-center mt-1">
+                       <span className="w-4 h-4 mr-2 inline-block"></span>
+                       Placement: {item.location_data.address}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-400 mt-2">
                     ID: {item.id}
                   </p>

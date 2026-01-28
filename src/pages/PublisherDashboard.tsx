@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { LogOut, BarChart2, List, Settings, Plus, Download, Eye, DollarSign, Upload } from 'lucide-react';
+import { LogOut, BarChart2, List, Settings, Plus, Download, Eye, DollarSign, Upload, HelpCircle } from 'lucide-react';
 import PublisherDealsList from '@/components/PublisherDealsList';
 import PublisherInventoryList from '@/components/PublisherInventoryList';
 import AddInventoryModal from '@/components/AddInventoryModal';
@@ -96,6 +96,10 @@ export default function PublisherDashboard() {
             <Settings className="w-5 h-5" />
             <span>Settings</span>
           </a>
+          <Link to="/help" className="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 text-gray-600 rounded-lg text-sm font-medium transition-colors">
+            <HelpCircle className="w-5 h-5" />
+            <span>Help & Support</span>
+          </Link>
         </nav>
         <div className="p-4 border-t border-gray-100">
           <div className="flex items-center space-x-3 px-4 py-3 bg-gray-50 rounded-xl">
@@ -222,7 +226,7 @@ export default function PublisherDashboard() {
 
         {/* Detailed Lists */}
         <div className="space-y-8">
-          <PublisherInventoryList />
+          <PublisherInventoryList onAddInventory={() => setIsAddModalOpen(true)} />
           <PublisherDealsList />
         </div>
 
