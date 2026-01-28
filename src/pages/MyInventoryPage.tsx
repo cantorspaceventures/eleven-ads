@@ -23,6 +23,7 @@ interface InventoryItem {
   base_price_aed: number;
   is_available: boolean;
   created_at: string;
+  image_url?: string;
   dynamic_pricing?: {
     final_price_aed: number;
   }[];
@@ -271,10 +272,18 @@ export default function MyInventoryPage() {
                   className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group cursor-pointer"
                   onClick={() => navigate(`/publisher/inventory/${item.id}`)}
                 >
-                  <div className="h-40 bg-gradient-to-br from-gray-100 to-gray-200 relative flex items-center justify-center">
-                    <span className="text-4xl font-bold text-gray-300">
-                      {item.inventory_type.charAt(0)}
-                    </span>
+                  <div className="h-40 bg-gradient-to-br from-gray-100 to-gray-200 relative flex items-center justify-center overflow-hidden">
+                    {item.image_url ? (
+                      <img 
+                        src={item.image_url} 
+                        alt={item.location_data.address}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-4xl font-bold text-gray-300">
+                        {item.inventory_type.charAt(0)}
+                      </span>
+                    )}
                     <div className="absolute top-3 left-3">
                       <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${getTypeColor(item.inventory_type)}`}>
                         {item.inventory_type.replace('_', ' ').toUpperCase()}
