@@ -22,7 +22,11 @@ interface InventoryItem {
   }[];
 }
 
-export default function PublisherInventoryList() {
+interface PublisherInventoryListProps {
+  onAddInventory?: () => void;
+}
+
+export default function PublisherInventoryList({ onAddInventory }: PublisherInventoryListProps) {
   const navigate = useNavigate();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,13 +145,26 @@ export default function PublisherInventoryList() {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  if (loading) return <div className="p-8 text-center">Loading inventory...</div>;
+  const getInventoryDisplayName = (item: InventoryItem) => {
+    const data = item.location_data as any;
+    if (['streaming_radio', 'streaming_video', 'app', 'web'].includes(item.inventory_type)) {
+       return data.station_name || data.app_name || data.platform || data.address;
+    }
+    return data.address;
+  };
+
+  if (loading) {
+     return <div className="p-8 text-center">Loading inventory...</div>;
+   }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-heading font-bold text-secondary">Inventory Listing & Management</h2>
-        <button className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center">
+        <button 
+          onClick={onAddInventory}
+          className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center"
+        >
           <Plus className="w-4 h-4 mr-2" /> Add Inventory
         </button>
       </div>
@@ -218,9 +235,16 @@ export default function PublisherInventoryList() {
                     {item.id.substring(0, 8).toUpperCase()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-gray-900">{item.location_data.address}</span>
-                      <span className="text-xs text-gray-500">{item.location_emirate}</span>
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl">
+                        {item.inventory_type === 'OOH' ? '🏙️' : 
+                         item.inventory_type === 'DOOH' ? '📺' : 
+                         item.inventory_type.includes('streaming') ? '🎧' : '📱'}
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{getInventoryDisplayName(item)}</div>
+                        <div className="text-sm text-gray-500">{item.location_emirate}</div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

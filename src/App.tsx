@@ -16,6 +16,7 @@ import UpdatePasswordPage from "@/pages/UpdatePasswordPage";
 import MyInventoryPage from "@/pages/MyInventoryPage";
 import PublisherInventoryDetailPage from "@/pages/PublisherInventoryDetailPage";
 import BuyerAccessRulesPage from "@/pages/BuyerAccessRulesPage";
+import HelpCenterPage from "@/pages/HelpCenterPage";
 import { Toaster } from 'sonner';
 
 export default function App() {
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/rtb-simulator" element={<RTBSimulatorPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
         <Route path="/inventory/:id" element={<InventoryDetailPage />} />
+        <Route path="/help" element={<HelpCenterPage />} />
         {/* Redirect unknown routes to landing */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

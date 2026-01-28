@@ -25,7 +25,10 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
     mau: '',
     bounce_rate: '',
     website_category: '',
-    app_category: ''
+    app_category: '',
+    // Audio Specific Fields
+    station_name: '',
+    placement_type: ''
   });
 
   // Reset form when type changes to avoid carry-over of irrelevant data
@@ -62,6 +65,10 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
       const payload: any = {
         owner_id: user.id,
         ...rest,
+        // Ensure location_data JSON structure is created if needed by backend, 
+        // or just pass flattened fields if backend handles it. 
+        // Assuming backend handles flattened or we map specific fields.
+        // For now we pass all extended fields.
         daily_impressions: Number(formData.daily_impressions),
         base_price_aed: Number(formData.base_price_aed),
       };
@@ -94,6 +101,37 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
             return (
                 <div className="space-y-4 border-t border-gray-100 pt-4 animate-in fade-in">
                     <h3 className="font-bold text-gray-900 flex items-center text-sm"><Radio className="w-4 h-4 mr-2" /> Audio Specifics</h3>
+                    
+                    {/* New Fields for Streaming Audio */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Station / App Name</label>
+                            <input 
+                                type="text" 
+                                name="station_name" 
+                                value={formData.station_name} 
+                                onChange={handleChange} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                                placeholder="e.g. Spotify, Virgin Radio" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Placement Type</label>
+                            <select 
+                                name="placement_type" 
+                                value={formData.placement_type} 
+                                onChange={handleChange} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                            >
+                                <option value="">Select Placement...</option>
+                                <option value="Pre-roll">Pre-roll</option>
+                                <option value="Mid-roll">Mid-roll</option>
+                                <option value="Post-roll">Post-roll</option>
+                                <option value="Banner Companion">Banner Companion</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">Station Format</label>
@@ -120,6 +158,37 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
             return (
                 <div className="space-y-4 border-t border-gray-100 pt-4 animate-in fade-in">
                      <h3 className="font-bold text-gray-900 flex items-center text-sm"><MonitorPlay className="w-4 h-4 mr-2" /> Video Specifics</h3>
+                     
+                     {/* New Fields for Streaming Video */}
+                     <div className="grid grid-cols-2 gap-4">
+                         <div>
+                             <label className="block text-xs font-medium text-gray-500 mb-1">Station / App Name</label>
+                             <input 
+                                 type="text" 
+                                 name="station_name" 
+                                 value={formData.station_name} 
+                                 onChange={handleChange} 
+                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                                 placeholder="e.g. YouTube, Shahid, Netflix" 
+                             />
+                         </div>
+                         <div>
+                             <label className="block text-xs font-medium text-gray-500 mb-1">Placement Type</label>
+                             <select 
+                                 name="placement_type" 
+                                 value={formData.placement_type} 
+                                 onChange={handleChange} 
+                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                             >
+                                 <option value="">Select Placement...</option>
+                                 <option value="Pre-roll">Pre-roll</option>
+                                 <option value="Mid-roll">Mid-roll</option>
+                                 <option value="Post-roll">Post-roll</option>
+                                 <option value="Overlay">Overlay</option>
+                             </select>
+                         </div>
+                     </div>
+
                      <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">Video Quality</label>
@@ -142,6 +211,38 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
             return (
                 <div className="space-y-4 border-t border-gray-100 pt-4 animate-in fade-in">
                     <h3 className="font-bold text-gray-900 flex items-center text-sm"><Smartphone className="w-4 h-4 mr-2" /> App Metrics</h3>
+                    
+                    {/* New Fields for Mobile App */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">App Name</label>
+                            <input 
+                                type="text" 
+                                name="station_name" 
+                                value={formData.station_name} 
+                                onChange={handleChange} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                                placeholder="e.g. Candy Crush, TikTok" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Placement Type</label>
+                            <select 
+                                name="placement_type" 
+                                value={formData.placement_type} 
+                                onChange={handleChange} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                            >
+                                <option value="">Select Placement...</option>
+                                <option value="Banner">Banner</option>
+                                <option value="Interstitial">Interstitial</option>
+                                <option value="Rewarded Video">Rewarded Video</option>
+                                <option value="Native">Native</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">App Category</label>
@@ -164,6 +265,39 @@ export default function AddInventoryModal({ isOpen, onClose }: AddInventoryModal
              return (
                 <div className="space-y-4 border-t border-gray-100 pt-4 animate-in fade-in">
                     <h3 className="font-bold text-gray-900 flex items-center text-sm"><Globe className="w-4 h-4 mr-2" /> Web Analytics</h3>
+                    
+                    {/* New Fields for Web Portal */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Website Name</label>
+                            <input 
+                                type="text" 
+                                name="station_name" 
+                                value={formData.station_name} 
+                                onChange={handleChange} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                                placeholder="e.g. Gulf News, Dubizzle" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Placement Type</label>
+                            <select 
+                                name="placement_type" 
+                                value={formData.placement_type} 
+                                onChange={handleChange} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                            >
+                                <option value="">Select Placement...</option>
+                                <option value="Leaderboard">Leaderboard (728x90)</option>
+                                <option value="Rectangle">Rectangle (300x250)</option>
+                                <option value="Skyscraper">Skyscraper (160x600)</option>
+                                <option value="Billboard">Billboard (970x250)</option>
+                                <option value="Skin">Skin / Wallpaper</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">Website Category</label>

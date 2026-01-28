@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Search, Filter, MapPin, Eye, DollarSign, ArrowRight, Loader } from 'lucide-react';
+import { Search, Filter, MapPin, Eye, DollarSign, ArrowRight, Loader, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Logo from '@/components/Logo';
+import { supabase } from '@/lib/supabase';
 
 interface Inventory {
   id: string;
@@ -28,10 +29,17 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [selectedEmirate, setSelectedEmirate] = useState('all');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
+    checkUser();
     fetchInventory();
   }, [selectedType, selectedEmirate]);
+
+  const checkUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setIsLoggedIn(!!user);
+  };
 
   const fetchInventory = async () => {
     setLoading(true);
@@ -65,6 +73,23 @@ export default function InventoryPage() {
     return address.toLowerCase().includes(searchTerm.toLowerCase()) ||
       businessName.toLowerCase().includes(searchTerm.toLowerCase());
   });
+
+  const getInventoryDisplayName = (item: Inventory) => {
+    // For digital types, use station_name or app_name or platform if available
+    // These might be nested in location_data depending on how the backend stores it
+    // Based on seed data, it seems to be in location_data under different keys or we might need to adjust
+    // For now, let's assume we store it in a consistent way or check multiple fields
+    
+    // We will use 'address' as the fallback for OOH/DOOH, but for others check extended props
+    // Note: The interface needs to be updated if we want typescript to be happy with extended fields
+    // casting to any for flexibility in this demo update
+    const data = item.location_data as any;
+    
+    if (['streaming_radio', 'streaming_video', 'app', 'web'].includes(item.inventory_type)) {
+       return data.station_name || data.app_name || data.platform || data.address;
+    }
+    return data.address;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -157,8 +182,8 @@ export default function InventoryPage() {
                 
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-bold text-secondary line-clamp-1" title={item.location_data.address}>
-                      {item.location_data.address}
+                    <h3 className="text-lg font-bold text-secondary line-clamp-1" title={getInventoryDisplayName(item)}>
+                      {getInventoryDisplayName(item)}
                     </h3>
                   </div>
                   <p className="text-sm text-gray-500 mb-4">{item.premium_users.business_name}</p>
@@ -183,14 +208,26 @@ export default function InventoryPage() {
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                     <div>
                       <p className="text-xs text-gray-400">Base Price</p>
-                      <p className="text-lg font-bold text-secondary flex items-center">
-                        <DollarSign className="w-4 h-4 mr-1" />
-                        {item.base_price_aed.toLocaleString()} <span className="text-xs font-normal text-gray-400 ml-1">AED</span>
-                      </p>
+                      {isLoggedIn ? (
+                        <p className="text-lg font-bold text-secondary flex items-center">
+                          <DollarSign className="w-4 h-4 mr-1" />
+                          {item.base_price_aed.toLocaleString()} <span className="text-xs font-normal text-gray-400 ml-1">AED</span>
+                        </p>
+                      ) : (
+                        <Link to="/login" className="text-sm font-medium text-primary flex items-center hover:underline mt-1">
+                          <Lock className="w-3 h-3 mr-1" /> Login to view
+                        </Link>
+                      )}
                     </div>
-                    <Link to={`/inventory/${item.id}`} className="bg-secondary text-white p-2 rounded-lg hover:bg-secondary/90 transition-colors group-hover:scale-105 transform duration-200">
-                      <ArrowRight className="w-5 h-5" />
-                    </Link>
+                    {isLoggedIn ? (
+                      <Link to={`/inventory/${item.id}`} className="bg-secondary text-white p-2 rounded-lg hover:bg-secondary/90 transition-colors group-hover:scale-105 transform duration-200">
+                        <ArrowRight className="w-5 h-5" />
+                      </Link>
+                    ) : (
+                      <Link to="/login" className="bg-gray-100 text-gray-400 p-2 rounded-lg hover:bg-gray-200 transition-colors">
+                        <ArrowRight className="w-5 h-5" />
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>

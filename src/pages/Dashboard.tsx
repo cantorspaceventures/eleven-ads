@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { LogOut, BarChart2, TrendingUp, DollarSign, Activity } from 'lucide-react';
+import { LogOut, BarChart2, TrendingUp, DollarSign, Activity, HelpCircle } from 'lucide-react';
 import MyDealsList from '@/components/MyDealsList';
 import Logo from '@/components/Logo';
 
@@ -53,6 +53,10 @@ export default function Dashboard() {
           <Link to="/campaigns/analytics" className="flex items-center space-x-3 px-4 py-3 hover:bg-white/5 rounded-lg text-sm font-medium transition-colors text-gray-300 hover:text-white">
             <Activity className="w-5 h-5" />
             <span>Analytics</span>
+          </Link>
+          <Link to="/help" className="flex items-center space-x-3 px-4 py-3 hover:bg-white/5 rounded-lg text-sm font-medium transition-colors text-gray-300 hover:text-white">
+            <HelpCircle className="w-5 h-5" />
+            <span>Help Center</span>
           </Link>
         </nav>
         <div className="p-4 border-t border-white/10">
