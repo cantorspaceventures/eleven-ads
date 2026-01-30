@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { Search, Plus, ChevronLeft, ChevronRight, ToggleLeft, ToggleRight, Shield, Trash2, Eye } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight, ToggleLeft, ToggleRight, Shield, Trash2, Eye, Code } from 'lucide-react';
 import { toast } from 'sonner';
+import IntegrationModal from '@/components/IntegrationModal';
 
 interface InventoryItem {
   id: string;
@@ -35,6 +36,7 @@ export default function PublisherInventoryList({ onAddInventory }: PublisherInve
   const [selectedStatus, setSelectedStatus] = useState('All Status');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [integrationItem, setIntegrationItem] = useState<InventoryItem | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -146,11 +148,11 @@ export default function PublisherInventoryList({ onAddInventory }: PublisherInve
   });
 
   const getInventoryDisplayName = (item: InventoryItem) => {
-    const data = item.location_data as any;
+    const data = (item.location_data || {}) as any;
     if (['streaming_radio', 'streaming_video', 'app', 'web'].includes(item.inventory_type)) {
-       return data.station_name || data.app_name || data.platform || data.address;
+       return data.station_name || data.app_name || data.platform || data.address || 'Untitled';
     }
-    return data.address;
+    return data.address || 'Unknown Location';
   };
 
   if (loading) {
@@ -159,6 +161,15 @@ export default function PublisherInventoryList({ onAddInventory }: PublisherInve
 
   return (
     <div className="space-y-6">
+      {integrationItem && (
+        <IntegrationModal
+          isOpen={!!integrationItem}
+          onClose={() => setIntegrationItem(null)}
+          inventoryId={integrationItem.id}
+          inventoryName={getInventoryDisplayName(integrationItem)}
+          inventoryType={integrationItem.inventory_type}
+        />
+      )}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-heading font-bold text-secondary">Inventory Listing & Management</h2>
         <button 
@@ -239,7 +250,7 @@ export default function PublisherInventoryList({ onAddInventory }: PublisherInve
                       <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl">
                         {item.inventory_type === 'OOH' ? '🏙️' : 
                          item.inventory_type === 'DOOH' ? '📺' : 
-                         item.inventory_type.includes('streaming') ? '🎧' : '📱'}
+                         (item.inventory_type || '').includes('streaming') ? '🎧' : '📱'}
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{getInventoryDisplayName(item)}</div>
@@ -285,6 +296,13 @@ export default function PublisherInventoryList({ onAddInventory }: PublisherInve
                         title="Buyer Access Rules"
                       >
                         <Shield className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setIntegrationItem(item)}
+                        className="text-purple-600 hover:text-purple-700 p-1.5 rounded hover:bg-gray-100 transition-colors"
+                        title="Live Integration"
+                      >
+                        <Code className="w-4 h-4" />
                       </button>
                       <button 
                         onClick={() => handleDelete(item)}

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { 
   ArrowLeft, MapPin, Eye, DollarSign, Edit, Trash2, ToggleLeft, ToggleRight,
-  LogOut, BarChart2, List, Settings, Clock, TrendingUp, Calendar, Save, Shield
+  LogOut, BarChart2, List, Settings, Clock, TrendingUp, Calendar, Save, Shield, Code
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Logo from '@/components/Logo';
@@ -61,6 +61,7 @@ export default function PublisherInventoryDetailPage() {
   const [allInventory, setAllInventory] = useState<InventoryDetail[]>([]);
   const [availabilitySettings, setAvailabilitySettings] = useState<AvailabilitySettings | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isIntegrationModalOpen, setIsIntegrationModalOpen] = useState(false);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -347,6 +348,12 @@ export default function PublisherInventoryDetailPage() {
                   >
                     <Shield className="w-4 h-4 mr-2" /> Buyer Access Rules
                   </Link>
+                  <button
+                    onClick={() => setIsIntegrationModalOpen(true)}
+                    className="flex items-center px-4 py-2 bg-purple-50 text-purple-700 rounded-lg font-medium hover:bg-purple-100 transition-colors"
+                  >
+                    <Code className="w-4 h-4 mr-2" /> Live Integration
+                  </button>
                   <button
                     onClick={handleToggleAvailability}
                     className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
