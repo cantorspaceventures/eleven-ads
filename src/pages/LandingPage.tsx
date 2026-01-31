@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, BarChart3, ShieldCheck, Zap } from 'lucide-react';
+import { ArrowRight, BarChart3, ShieldCheck, Zap, Globe, Lock, Crown } from 'lucide-react';
 import Logo from '@/components/Logo';
 
 export default function LandingPage() {
@@ -63,24 +63,48 @@ export default function LandingPage() {
           
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-6">
+                <Globe className="w-6 h-6 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-secondary mb-3">Open Auction (RTB)</h3>
+              <p className="text-gray-500">Real-time bidding on the open market. Access remnant inventory instantly with our OpenRTB 2.6 engine.</p>
+            </div>
+
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-6">
+                <Lock className="w-6 h-6 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-secondary mb-3">Private Deals (PMP)</h3>
+              <p className="text-gray-500">Invite-only auctions and preferred deals. Negotiate directly with publishers for first-look access.</p>
+            </div>
+            
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-6">
+                <Crown className="w-6 h-6 text-purple-600" />
+              </div>
+              <h3 className="text-xl font-bold text-secondary mb-3">Programmatic Guaranteed</h3>
+              <p className="text-gray-500">Secure fixed-price, guaranteed volume contracts programmatically. Premium inventory with no uncertainty.</p>
+            </div>
+
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-6">
                 <Zap className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-xl font-bold text-secondary mb-3">Dynamic Pricing</h3>
-              <p className="text-gray-500">Real-time pricing adjustments based on demand, time, and availability with full AI explainability.</p>
+              <h3 className="text-xl font-bold text-secondary mb-3">Dynamic AI Pricing</h3>
+              <p className="text-gray-500">Smart floor prices that adapt to real-time demand, time-of-day, and availability multipliers.</p>
             </div>
             
             <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
               <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center mb-6">
                 <ShieldCheck className="w-6 h-6 text-secondary" />
               </div>
-              <h3 className="text-xl font-bold text-secondary mb-3">Premium Guaranteed</h3>
-              <p className="text-gray-500">Secure preferred deals and programmatic guaranteed contracts with top-tier UAE publishers.</p>
+              <h3 className="text-xl font-bold text-secondary mb-3">Brand Safety</h3>
+              <p className="text-gray-500">Verified publishers and strict creative review policies ensure a safe environment for your brand.</p>
             </div>
             
             <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-6">
-                <BarChart3 className="w-6 h-6 text-primary" />
+              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-6">
+                <BarChart3 className="w-6 h-6 text-orange-600" />
               </div>
               <h3 className="text-xl font-bold text-secondary mb-3">Transparent Analytics</h3>
               <p className="text-gray-500">Clear insights into spending, performance, and pricing factors. No black-box algorithms.</p>
