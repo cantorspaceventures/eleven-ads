@@ -21,6 +21,7 @@ interface Inventory {
   premium_users: {
     business_name: string;
   };
+  image_url?: string;
 }
 
 export default function InventoryPage() {
@@ -171,8 +172,18 @@ export default function InventoryPage() {
             {filteredInventory.map((item) => (
               <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group">
                 <div className="h-48 bg-gray-100 relative">
-                  {/* Placeholder for Image */}
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-200">
+                  {item.image_url ? (
+                    <img 
+                      src={item.image_url} 
+                      alt={getInventoryDisplayName(item)}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div className={`absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-200 ${item.image_url ? 'hidden' : ''}`}>
                     <span className="font-medium">{item.inventory_type} Preview</span>
                   </div>
                   <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-secondary shadow-sm">
